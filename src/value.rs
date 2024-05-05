@@ -1,5 +1,5 @@
 pub struct ValueArray {
-    values: Vec<f64>,
+    pub values: Vec<f64>,
 }
 
 impl ValueArray {
@@ -17,3 +17,4 @@ impl ValueArray {
         self.values.len()
     }
 }
+
