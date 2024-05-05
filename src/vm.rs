@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use leetrust::{chunk::Chunk, OpCode};
-
+use crate::compiler::compile;
 
 pub struct VM {
     chunk: Option<Rc<Chunk>>,
@@ -37,6 +37,16 @@ impl VM {
         self.chunk = Some(chunk);
         self.ip = 0;
         self.run()
+    }
+
+    pub fn compile_and_run(&mut self, source: &str) -> InterpretResult {
+        // Reset the VM state
+        self.reset_stack();
+        self.chunk = None; // Reset the chunk
+        
+        // Assume compile function returns a Result<Option<Chunk>, CompileError>
+        compile(source);
+        return InterpretResult::Ok;
     }
 
     fn run(&mut self) -> InterpretResult {
