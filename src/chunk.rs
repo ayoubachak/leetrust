@@ -1,4 +1,5 @@
 use crate::{value::ValueArray, OpCode};
+use crate::debug::disassemble_chunk;
 
 pub struct Chunk {
     pub code: Vec<OpCode>,
@@ -45,5 +46,9 @@ impl Chunk {
             self.code.push(OpCode::from_usize(index & 0xFF).unwrap());
         }
         index
+    }
+
+    pub fn disassemble(&self, name: &str) {
+        disassemble_chunk(self, name)
     }
 }

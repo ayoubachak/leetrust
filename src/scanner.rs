@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenType {
     // Single-character tokens
     LeftParen, RightParen, LeftBrace, RightBrace,
@@ -8,6 +8,9 @@ pub enum TokenType {
     Greater, GreaterEqual, Less, LessEqual,
     // Literals
     Identifier, String, Number,
+    // String Interpolation
+    InterpolationStart,
+    InterpolationEnd,
     // Keywords
     And, Class, Else, False, Fun, For, If, Nil, Or,
     Print, Return, Super, This, True, Var, While,
@@ -15,11 +18,23 @@ pub enum TokenType {
     Error, Eof
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct Token<'a> {
     pub type_: TokenType,
     pub start: &'a str,
     pub length: usize,
     pub line: usize,
+}
+
+impl<'a> Default for Token<'a> {
+    fn default() -> Self {
+        Token {
+            type_: TokenType::Eof,  // Or any other default type
+            start: "",
+            length: 0,
+            line: 0,
+        }
+    }
 }
 
 pub struct Scanner<'a> {
@@ -58,6 +73,14 @@ impl<'a> Scanner<'a> {
 
     fn is_at_end(&self) -> bool {
         self.current >= self.source.len()
+    }
+
+    fn is_alpha(c: char) -> bool {
+        c.is_ascii_alphabetic() || c == '_'
+    }
+
+    fn is_digit(c: char) -> bool {
+        c.is_ascii_digit()
     }
 
     fn match_char(&mut self, expected: char) -> bool {
@@ -194,11 +217,11 @@ impl<'a> Scanner<'a> {
     pub fn scan_token(&mut self) -> Token<'a> {
         self.skip_whitespace();
         self.start = self.current;
-        
+    
         if self.is_at_end() {
             return self.make_token(TokenType::Eof);
         }
-
+    
         let c = self.advance();
         match c {
             '(' => self.make_token(TokenType::LeftParen),
@@ -236,4 +259,7 @@ impl<'a> Scanner<'a> {
             },
         }
     }
+
+    
+
 }

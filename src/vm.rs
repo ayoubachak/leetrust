@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
 use leetrust::{chunk::Chunk, OpCode};
-use crate::compiler::compile;
+use crate::compiler::Compiler;
 
 pub struct VM {
-    chunk: Option<Rc<Chunk>>,
+    chunk: Option<Chunk>,
     ip: usize,  // Instruction pointer
     stack: Vec<f64>,  // Stack to hold values
 }
@@ -26,42 +26,45 @@ impl VM {
         self.stack.push(value);
     }
 
-    pub fn pop(&mut self) -> f64 {
-        self.stack.pop().expect("Stack underflow!")
+    pub fn pop(&mut self) -> Option<f64> {
+        self.stack.pop()
     }
 }
 
 
 impl VM {
-    pub fn interpret(&mut self, chunk: Rc<Chunk>) -> InterpretResult {
-        self.chunk = Some(chunk);
-        self.ip = 0;
-        self.run()
+    pub fn interpret(&mut self) -> InterpretResult {
+        if self.chunk.is_some() {
+            self.ip = 0;
+            self.run()  // Use `run` without passing `chunk`
+        } else {
+            InterpretResult::CompileError
+        }
     }
 
     pub fn compile_and_run(&mut self, source: &str) -> InterpretResult {
         // Reset the VM state
         self.reset_stack();
         self.chunk = None; // Reset the chunk
-        
-        // Assume compile function returns a Result<Option<Chunk>, CompileError>
-        compile(source);
-        return InterpretResult::Ok;
+        let mut new_chunk = Chunk::new();
+        let compiler = Compiler::new(source, &mut new_chunk);
+        // I can't be bothered to fix this, sorry me from tomorrow
+        match compiler.compile() {
+            Ok(_) => {
+                self.chunk = Some(new_chunk);  // Move the compiled chunk into VM
+                self.interpret()
+            },
+            Err(_) => InterpretResult::CompileError,
+        }
     }
-
     fn run(&mut self) -> InterpretResult {
         loop {
-            // Debugging: Output the current state of the stack
-            if cfg!(feature = "debug_trace_execution") {
-                self.debug_instruction(); // Debug the next instruction to execute
-            }
-
             if self.ip >= self.chunk.as_ref().unwrap().code.len() {
                 return InterpretResult::CompileError;
             }
-
+    
             let instruction = self.read_byte();
-
+    
             match OpCode::from_u8(instruction) {
                 Some(OpCode::Constant) => {
                     let constant_idx = self.read_byte() as usize;
@@ -74,47 +77,42 @@ impl VM {
                     self.push(value);
                 },
                 Some(OpCode::Negate) => {
-                    let value = self.pop();
+                    let value = self.pop().unwrap();
                     self.push(-value);
                 },
                 Some(OpCode::Add) => {
-                    let b = self.pop();
-                    let a = self.pop();
+                    let b = self.pop().unwrap();
+                    let a = self.pop().unwrap();
                     self.push(a + b);
                 },
                 Some(OpCode::Subtract) => {
-                    let b = self.pop();
-                    let a = self.pop();
+                    let b = self.pop().unwrap();
+                    let a = self.pop().unwrap();
                     self.push(a - b);
                 },
                 Some(OpCode::Multiply) => {
-                    let b = self.pop();
-                    let a = self.pop();
+                    let b = self.pop().unwrap();
+                    let a = self.pop().unwrap();
                     self.push(a * b);
                 },
                 Some(OpCode::Divide) => {
-                    let b = self.pop();
-                    let a = self.pop();
+                    let b = self.pop().unwrap();
+                    let a = self.pop().unwrap();
                     self.push(a / b);
                 },
                 Some(OpCode::Return) => {
-                    let value = self.pop();
-                    println!("{}", value); // Assuming we have Display for f64
-                    if cfg!(feature = "debug_trace_execution") {
-                        self.debug_stack(); // Output the stack's state after popping
-                    }
-                    return InterpretResult::Ok;
+                    let value =  match self.pop() {
+                        Some(value) => {
+                            println!("{}", value);
+                            return InterpretResult::Ok;
+                        },
+                        None => return InterpretResult::RuntimeError,
+                    };
                 },
                 _ => return InterpretResult::RuntimeError,
             }
-
-            // Debugging: Output the current state of the stack after the instruction
-            if cfg!(feature = "debug_trace_execution") {
-                self.debug_stack();
-            }
         }
     }
-
     fn read_byte(&mut self) -> u8 {
         let byte = self.chunk.as_ref().unwrap().code[self.ip];
         self.ip += 1;
