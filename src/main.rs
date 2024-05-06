@@ -1,6 +1,8 @@
+// main.rs
 mod vm;
 mod compiler;
 mod scanner;
+mod object;
 use leetrust::*;
 use vm::{InterpretResult, VM};
 use std::rc::Rc;

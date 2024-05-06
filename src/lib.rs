@@ -1,3 +1,4 @@
+// lib.rs
 pub mod chunk;
 pub mod value;
 pub mod memory;
@@ -64,6 +65,7 @@ pub enum OpCode {
     ImportClassPropertyAs,
     ImportSuperclassProperty,
     ImportSuperclassPropertyAs,
+    String,
 }
 
 impl OpCode {
@@ -128,7 +130,7 @@ impl OpCode {
             56 => Some(OpCode::ImportClassPropertyAs),
             57 => Some(OpCode::ImportSuperclassProperty),
             58 => Some(OpCode::ImportSuperclassPropertyAs),
-            
+            59 => Some(OpCode::String),
             _ => None,
         }
     }
@@ -194,6 +196,7 @@ impl OpCode {
             OpCode::ImportClassPropertyAs => 56,
             OpCode::ImportSuperclassProperty => 57,
             OpCode::ImportSuperclassPropertyAs => 58,
+            OpCode::String => 59,
         }
     }
 
@@ -258,6 +261,7 @@ impl OpCode {
             56 => Some(OpCode::ImportClassPropertyAs),
             57 => Some(OpCode::ImportSuperclassProperty),
             58 => Some(OpCode::ImportSuperclassPropertyAs),
+            59 => Some(OpCode::String),
             _ => None,
         }
     }
@@ -325,6 +329,7 @@ impl std::fmt::Display for OpCode {
             OpCode::ImportClassPropertyAs => write!(f, "OP_IMPORT_CLASS_PROPERTY_AS"),
             OpCode::ImportSuperclassProperty => write!(f, "OP_IMPORT_SUPERCLASS_PROPERTY"),
             OpCode::ImportSuperclassPropertyAs => write!(f, "OP_IMPORT_SUPERCLASS_PROPERTY_AS"),
+            OpCode::String => write!(f, "OP_STRING"),
             _ => write!(f, "Unknown opcode"),
         }
     }
@@ -390,4 +395,4 @@ pub const OP_IMPORT_CLASS_PROPERTY: OpCode = OpCode::ImportClassProperty;
 pub const OP_IMPORT_CLASS_PROPERTY_AS: OpCode = OpCode::ImportClassPropertyAs;
 pub const OP_IMPORT_SUPERCLASS_PROPERTY: OpCode = OpCode::ImportSuperclassProperty;
 pub const OP_IMPORT_SUPERCLASS_PROPERTY_AS: OpCode = OpCode::ImportSuperclassPropertyAs;
-
+pub const OP_STRING: OpCode = OpCode::String;

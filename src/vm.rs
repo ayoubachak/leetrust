@@ -1,12 +1,13 @@
+// vm.rs
 use std::rc::Rc;
 
-use leetrust::{chunk::Chunk, OpCode};
+use leetrust::{chunk::Chunk, value::Value, OpCode};
 use crate::compiler::Compiler;
 
 pub struct VM {
     chunk: Option<Chunk>,
     ip: usize,  // Instruction pointer
-    stack: Vec<f64>,  // Stack to hold values
+    stack: Vec<Value>,  // Stack to hold values
 }
 
 impl VM {
@@ -22,11 +23,11 @@ impl VM {
         self.stack.clear();
     }
 
-    pub fn push(&mut self, value: f64) {
+    pub fn push(&mut self, value: Value) {
         self.stack.push(value);
     }
 
-    pub fn pop(&mut self) -> Option<f64> {
+    pub fn pop(&mut self) -> Option<Value> {
         self.stack.pop()
     }
 }
@@ -76,52 +77,79 @@ impl VM {
                     let value = self.read_constant(constant_idx);
                     self.push(value);
                 },
-                Some(OpCode::Nil) => self.push(0.0),  // Using 0.0 to represent nil
-                Some(OpCode::True) => self.push(1.0), // Using 1.0 to represent true
-                Some(OpCode::False) => self.push(0.0),// Using 0.0 to represent false
+                Some(OpCode::Nil) => self.push(Value::None),  // Using 0.0 to represent nil
+                Some(OpCode::True) => self.push(Value::Bool(true)), // Using 1.0 to represent true
+                Some(OpCode::False) => self.push(Value::Bool(false)),// Using 0.0 to represent false
                 
                 Some(OpCode::Negate) => {
                     let value = self.pop().unwrap();
-                    self.push(-value);
+                    match -value {
+                        result => self.push(result.unwrap()),
+                        _ => return InterpretResult::RuntimeError,
+                    }
                 },
                 Some(OpCode::Not) => {
-                    let value = self.pop().unwrap_or(0.0);
-                    self.push(if value == 0.0 { 1.0 } else { 0.0 });  // Logical NOT
+                    let value = self.pop().unwrap_or(Value::Number(0.0));
+                    match !value {
+                        result => self.push(result.unwrap()),
+                        _ => return InterpretResult::RuntimeError,
+                    }
                 },
                 Some(OpCode::Add) => {
                     let b = self.pop().unwrap();
                     let a = self.pop().unwrap();
-                    self.push(a + b);
+                    match a + b {
+                        result => self.push(result.unwrap()),
+                        _ => return InterpretResult::RuntimeError,
+                    }
                 },
                 Some(OpCode::Subtract) => {
                     let b = self.pop().unwrap();
                     let a = self.pop().unwrap();
-                    self.push(a - b);
+                    match a - b {
+                        result => self.push(result.unwrap()),
+                        _ => return InterpretResult::RuntimeError,
+                    }
                 },
                 Some(OpCode::Multiply) => {
                     let b = self.pop().unwrap();
                     let a = self.pop().unwrap();
-                    self.push(a * b);
+                    match a * b {
+                        result => self.push(result.unwrap()),
+                        _ => return InterpretResult::RuntimeError,
+                    }
                 },
                 Some(OpCode::Divide) => {
                     let b = self.pop().unwrap();
                     let a = self.pop().unwrap();
-                    self.push(a / b);
+                    match a / b {
+                        result => self.push(result.unwrap()),
+                        _ => return InterpretResult::RuntimeError,
+                    }
                 },
                 Some(OpCode::Equal) => {
                     let b = self.pop().unwrap();
                     let a = self.pop().unwrap();
-                    self.push(if a == b { 1.0 } else { 0.0 });  // Equal
+                    match a == b {
+                        true => self.push(Value::Bool(true)),
+                        false => self.push(Value::Bool(false)),
+                    }
                 },
                 Some(OpCode::Greater) => {
                     let b = self.pop().unwrap();
                     let a = self.pop().unwrap();
-                    self.push(if a > b { 1.0 } else { 0.0 });  // Greater than
+                    match a > b {
+                        true => self.push(Value::Bool(true)),
+                        false => self.push(Value::Bool(false)),
+                    }
                 },
                 Some(OpCode::Less) => {
                     let b = self.pop().unwrap();
                     let a = self.pop().unwrap();
-                    self.push(if a < b { 1.0 } else { 0.0 });  // Less than
+                    match a < b {
+                        true => self.push(Value::Bool(true)),
+                        false => self.push(Value::Bool(false)),
+                    }
                 },
                 Some(OpCode::Return) => {
                     let value =  match self.pop() {
@@ -149,9 +177,10 @@ impl VM {
         (b1 << 16) | (b2 << 8) | b3
     }
 
-    fn read_constant(&self, index: usize) -> f64 {
-        self.chunk.as_ref().unwrap().constants.values[index]
+    fn read_constant(&self, index: usize) -> Value {
+        self.chunk.as_ref().unwrap().constants.values[index].clone()
     }
+    
 }
 
 impl VM {
@@ -168,6 +197,16 @@ impl VM {
         crate::debug::disassemble_instruction(self.chunk.as_ref().unwrap(), self.ip);
     }
 }
+
+impl VM {
+    fn concatenate(&mut self) {
+        let b = self.pop().unwrap().as_string();
+        let a = self.pop().unwrap().as_string();
+        let result = Rc::new((*a).clone() + &(*b));
+        self.push(Value::String(result));
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum InterpretResult {
     Ok,

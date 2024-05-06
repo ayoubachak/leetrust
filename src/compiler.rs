@@ -1,5 +1,7 @@
+// compiler.rs
 use std::collections::HashMap;
 
+use leetrust::value::Value;
 use leetrust::{chunk::Chunk, OpCode};
 
 use crate::scanner::{Scanner, TokenType, Token};
@@ -123,7 +125,7 @@ impl<'a> Compiler<'a> {
         self.emit_byte(OpCode::Return);
     }
 
-    fn make_constant(&mut self, value: f64) -> u8 {
+    fn make_constant(&mut self, value: Value) -> u8 {
         let constant = self.chunk.add_constant(value);
         if constant > u8::MAX as usize {
             self.error("Too many constants in one chunk.");
@@ -133,7 +135,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn emit_constant(&mut self, value: f64) {
+    fn emit_constant(&mut self, value: Value) {
         let constant = self.make_constant(value);
         self.emit_bytes(OpCode::Constant, OpCode::from_u8(constant).unwrap());
     }
@@ -171,61 +173,68 @@ impl<'a> Compiler<'a> {
         self.had_error = true;
     }
 
-        // Placeholder for parser rules (as in C version)
-        // Placeholder for expression(), number(), unary(), binary(), grouping(), and parse_precedence()
-        pub fn expression(&mut self) {
-            self.parse_precedence(Precedence::Assignment);
-        }
+    // Placeholder for parser rules (as in C version)
+    // Placeholder for expression(), number(), unary(), binary(), grouping(), and parse_precedence()
+    pub fn expression(&mut self) {
+        self.parse_precedence(Precedence::Assignment);
+    }
 
-        fn binary(&mut self) {
-            let operator_type = self.previous_token.type_;
-            let rule = self.get_rule(operator_type);
-            self.parse_precedence(rule.unwrap().precedence.next()); // Use the next precedence level for right-hand side of the operator
-        
-            match operator_type {
-                TokenType::Plus => self.emit_byte(OpCode::Add),
-                TokenType::Minus => self.emit_byte(OpCode::Subtract),
-                TokenType::Star => self.emit_byte(OpCode::Multiply),
-                TokenType::Slash => self.emit_byte(OpCode::Divide),
-                TokenType::BangEqual => { 
-                    self.emit_bytes(OpCode::Equal, OpCode::Not);  // Evaluate equality then negate the result
-                }
-                TokenType::EqualEqual => self.emit_byte(OpCode::Equal),
-                TokenType::Greater => self.emit_byte(OpCode::Greater),
-                TokenType::GreaterEqual => {
-                    self.emit_bytes(OpCode::Less, OpCode::Not);  // Evaluate less-than then negate the result
-                }
-                TokenType::Less => self.emit_byte(OpCode::Less),
-                TokenType::LessEqual => {
-                    self.emit_bytes(OpCode::Greater, OpCode::Not);  // Evaluate greater-than then negate the result
-                }
-                _ => {}
+    fn binary(&mut self) {
+        let operator_type = self.previous_token.type_;
+        let rule = self.get_rule(operator_type);
+        self.parse_precedence(rule.unwrap().precedence.next()); // Use the next precedence level for right-hand side of the operator
+    
+        match operator_type {
+            TokenType::Plus => self.emit_byte(OpCode::Add),
+            TokenType::Minus => self.emit_byte(OpCode::Subtract),
+            TokenType::Star => self.emit_byte(OpCode::Multiply),
+            TokenType::Slash => self.emit_byte(OpCode::Divide),
+            TokenType::BangEqual => { 
+                self.emit_bytes(OpCode::Equal, OpCode::Not);  // Evaluate equality then negate the result
             }
-        }
-
-        fn grouping(&mut self) {
-            self.expression();
-            self.consume(TokenType::RightParen, "Expect ')' after expression.");
-        }
-
-        fn number(&mut self) {
-            let value: f64 = self.previous_token.start.parse().unwrap_or(0.0);
-            self.emit_constant(value);
-        }
-
-        fn unary(&mut self) {
-            let operator_type = self.previous_token.type_;
-
-            // Compile the operand.
-            self.parse_precedence(Precedence::Unary);
-
-            // Emit the operator instruction.
-            match operator_type {
-                TokenType::Minus => self.emit_byte(OpCode::Negate),
-                TokenType::Bang => self.emit_byte(OpCode::Not),
-                _ => {}
+            TokenType::EqualEqual => self.emit_byte(OpCode::Equal),
+            TokenType::Greater => self.emit_byte(OpCode::Greater),
+            TokenType::GreaterEqual => {
+                self.emit_bytes(OpCode::Less, OpCode::Not);  // Evaluate less-than then negate the result
             }
+            TokenType::Less => self.emit_byte(OpCode::Less),
+            TokenType::LessEqual => {
+                self.emit_bytes(OpCode::Greater, OpCode::Not);  // Evaluate greater-than then negate the result
+            }
+            _ => {}
         }
+    }
+
+    fn grouping(&mut self) {
+        self.expression();
+        self.consume(TokenType::RightParen, "Expect ')' after expression.");
+    }
+
+    fn number(&mut self) {
+        let value: Value = Value::from_f64(self.previous_token.start.parse().unwrap_or(0.0));
+        self.emit_constant(value);
+    }
+
+    fn unary(&mut self) {
+        let operator_type = self.previous_token.type_;
+
+        // Compile the operand.
+        self.parse_precedence(Precedence::Unary);
+
+        // Emit the operator instruction.
+        match operator_type {
+            TokenType::Minus => self.emit_byte(OpCode::Negate),
+            TokenType::Bang => self.emit_byte(OpCode::Not),
+            _ => {}
+        }
+    }
+
+    fn string(&mut self) {
+        let value = self.previous_token.start;
+        let constant_index = self.make_constant(Value::from_string(Rc::new(value.to_owned())));
+        self.emit_bytes(OpCode::Constant, OpCode::from_u8(constant_index).unwrap());
+    }
+    
     pub fn compile(mut self) -> Result<&'a mut Chunk, InterpretResult> {
         self.expression();
         self.consume(TokenType::Eof, "Expect end of expression.");
@@ -329,6 +338,11 @@ impl Compiler<'_> {
             prefix: None,
             infix: Some(Rc::new(|comp: &mut Compiler| comp.binary())),
             precedence: Precedence::Comparison,
+        });
+        self.rules.insert(TokenType::String, ParseRule {
+            prefix: Some(Rc::new(|comp: &mut Compiler| comp.string())),
+            infix: None,
+            precedence: Precedence::Primary,
         });
         
         self.rules.insert(TokenType::Eof, ParseRule {

@@ -1,3 +1,5 @@
+use crate::value::Value;
+// chunk.rs
 use crate::{value::ValueArray, OpCode};
 use crate::debug::disassemble_chunk;
 
@@ -29,12 +31,12 @@ impl Chunk {
         self.code.push(byte);
     }
 
-    pub fn add_constant(&mut self, value: f64) -> usize {
+    pub fn add_constant(&mut self, value: Value) -> usize {
         self.constants.write(value);
         self.constants.count() - 1
     }
 
-    pub fn write_constant(&mut self, value: f64, line: usize) -> usize {
+    pub fn write_constant(&mut self, value: Value, line: usize) -> usize {
         let index = self.add_constant(value);
         if index < 256 {
             self.write(OpCode::Constant, line);

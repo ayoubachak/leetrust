@@ -1,3 +1,4 @@
+// scanner.rs
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenType {
     // Single-character tokens
@@ -181,19 +182,29 @@ impl<'a> Scanner<'a> {
     }
 
     fn string(&mut self) -> Token<'a> {
+        let start = self.current;
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
                 self.line += 1;
             }
             self.advance();
         }
-
+    
+        // Ensure string is terminated correctly
         if self.is_at_end() {
             return self.error_token("Unterminated string.");
         }
-
+    
+        // Create a string slice from the start to the current position minus the quote
+        let token = Token {
+            type_: TokenType::String,
+            start: &self.source[start..self.current],
+            length: self.current - start,
+            line: self.line,
+        };
+    
         self.advance();  // Skip the closing quote.
-        self.make_token(TokenType::String)
+        token
     }
 
     fn make_token(&self, type_: TokenType) -> Token<'a> {
