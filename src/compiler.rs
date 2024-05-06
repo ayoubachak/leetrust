@@ -187,6 +187,18 @@ impl<'a> Compiler<'a> {
                 TokenType::Minus => self.emit_byte(OpCode::Subtract),
                 TokenType::Star => self.emit_byte(OpCode::Multiply),
                 TokenType::Slash => self.emit_byte(OpCode::Divide),
+                TokenType::BangEqual => { 
+                    self.emit_bytes(OpCode::Equal, OpCode::Not);  // Evaluate equality then negate the result
+                }
+                TokenType::EqualEqual => self.emit_byte(OpCode::Equal),
+                TokenType::Greater => self.emit_byte(OpCode::Greater),
+                TokenType::GreaterEqual => {
+                    self.emit_bytes(OpCode::Less, OpCode::Not);  // Evaluate less-than then negate the result
+                }
+                TokenType::Less => self.emit_byte(OpCode::Less),
+                TokenType::LessEqual => {
+                    self.emit_bytes(OpCode::Greater, OpCode::Not);  // Evaluate greater-than then negate the result
+                }
                 _ => {}
             }
         }
@@ -210,6 +222,7 @@ impl<'a> Compiler<'a> {
             // Emit the operator instruction.
             match operator_type {
                 TokenType::Minus => self.emit_byte(OpCode::Negate),
+                TokenType::Bang => self.emit_byte(OpCode::Not),
                 _ => {}
             }
         }
@@ -281,6 +294,41 @@ impl Compiler<'_> {
             prefix: Some(Rc::new(|comp: &mut Compiler| comp.literal())),
             infix: None,
             precedence: Precedence::None,
+        });
+        self.rules.insert(TokenType::Bang, ParseRule {
+            prefix: Some(Rc::new(|comp: &mut Compiler| comp.unary())),
+            infix: None,
+            precedence: Precedence::Unary,  // Make sure the precedence is set appropriately
+        });
+        self.rules.insert(TokenType::EqualEqual, ParseRule {
+            prefix: None,
+            infix: Some(Rc::new(|comp: &mut Compiler| comp.binary())),
+            precedence: Precedence::Equality,
+        });
+        self.rules.insert(TokenType::BangEqual, ParseRule {
+            prefix: None,
+            infix: Some(Rc::new(|comp: &mut Compiler| comp.binary())),
+            precedence: Precedence::Equality,
+        });
+        self.rules.insert(TokenType::Greater, ParseRule {
+            prefix: None,
+            infix: Some(Rc::new(|comp: &mut Compiler| comp.binary())),
+            precedence: Precedence::Comparison,
+        });
+        self.rules.insert(TokenType::GreaterEqual, ParseRule {
+            prefix: None,
+            infix: Some(Rc::new(|comp: &mut Compiler| comp.binary())),
+            precedence: Precedence::Comparison,
+        });
+        self.rules.insert(TokenType::Less, ParseRule {
+            prefix: None,
+            infix: Some(Rc::new(|comp: &mut Compiler| comp.binary())),
+            precedence: Precedence::Comparison,
+        });
+        self.rules.insert(TokenType::LessEqual, ParseRule {
+            prefix: None,
+            infix: Some(Rc::new(|comp: &mut Compiler| comp.binary())),
+            precedence: Precedence::Comparison,
         });
         
         self.rules.insert(TokenType::Eof, ParseRule {

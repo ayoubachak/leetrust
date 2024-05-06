@@ -84,6 +84,10 @@ impl VM {
                     let value = self.pop().unwrap();
                     self.push(-value);
                 },
+                Some(OpCode::Not) => {
+                    let value = self.pop().unwrap_or(0.0);
+                    self.push(if value == 0.0 { 1.0 } else { 0.0 });  // Logical NOT
+                },
                 Some(OpCode::Add) => {
                     let b = self.pop().unwrap();
                     let a = self.pop().unwrap();
@@ -103,6 +107,21 @@ impl VM {
                     let b = self.pop().unwrap();
                     let a = self.pop().unwrap();
                     self.push(a / b);
+                },
+                Some(OpCode::Equal) => {
+                    let b = self.pop().unwrap();
+                    let a = self.pop().unwrap();
+                    self.push(if a == b { 1.0 } else { 0.0 });  // Equal
+                },
+                Some(OpCode::Greater) => {
+                    let b = self.pop().unwrap();
+                    let a = self.pop().unwrap();
+                    self.push(if a > b { 1.0 } else { 0.0 });  // Greater than
+                },
+                Some(OpCode::Less) => {
+                    let b = self.pop().unwrap();
+                    let a = self.pop().unwrap();
+                    self.push(if a < b { 1.0 } else { 0.0 });  // Less than
                 },
                 Some(OpCode::Return) => {
                     let value =  match self.pop() {
