@@ -227,6 +227,14 @@ impl<'a> Compiler<'a> {
 
 
 impl Compiler<'_> {
+    fn literal(&mut self) {
+        match self.previous_token.type_ {
+            TokenType::False => self.emit_byte(OpCode::False),
+            TokenType::Nil => self.emit_byte(OpCode::Nil),
+            TokenType::True => self.emit_byte(OpCode::True),
+            _ => self.error("Unhandled literal"),
+        }
+    }
     fn setup_rules(&mut self) {
         println!("Setting up rules");
         self.rules.insert(TokenType::Plus, ParseRule {
@@ -259,6 +267,21 @@ impl Compiler<'_> {
             infix: None,
             precedence: Precedence::Primary,
         });
+        self.rules.insert(TokenType::False, ParseRule {
+            prefix: Some(Rc::new(|comp: &mut Compiler| comp.literal())),
+            infix: None,
+            precedence: Precedence::None,
+        });
+        self.rules.insert(TokenType::Nil, ParseRule {
+            prefix: Some(Rc::new(|comp: &mut Compiler| comp.literal())),
+            infix: None,
+            precedence: Precedence::None,
+        });
+        self.rules.insert(TokenType::True, ParseRule {
+            prefix: Some(Rc::new(|comp: &mut Compiler| comp.literal())),
+            infix: None,
+            precedence: Precedence::None,
+        });
         
         self.rules.insert(TokenType::Eof, ParseRule {
             prefix: None,
@@ -272,18 +295,14 @@ impl Compiler<'_> {
  
 
 
-    fn get_rule(&self, type_: TokenType) -> Option<&ParseRule> {
-        if let Some(rule) = self.rules.get(&type_) {
-            return Some(rule);
-        } else {
-            return None;
-        }
+    fn get_rule(&self, type_: TokenType) -> Option<ParseRule> {
+        self.rules.get(&type_).cloned()  // Clone the ParseRule here
     }
 
     fn parse_precedence(&mut self, precedence: Precedence) {
         self.advance();
         let current_type = self.previous_token.type_;
-        let rule = self.get_rule(current_type).cloned();  // Clone the rule to separate its lifecycle from `self`
+        let rule = self.get_rule(current_type);  // Clone the rule to separate its lifecycle from `self`
     
         if let Some(rule) = rule {
             if let Some(prefix) = &rule.prefix {
@@ -297,7 +316,7 @@ impl Compiler<'_> {
             return;
         }
     
-        while let Some(next_rule) = self.get_rule(self.current_token.type_).cloned() {  // Clone each time to avoid borrowing issues
+        while let Some(next_rule) = self.get_rule(self.current_token.type_) {  // Clone each time to avoid borrowing issues
             if precedence <= next_rule.precedence {
                 self.advance();
                 if let Some(infix) = next_rule.infix {

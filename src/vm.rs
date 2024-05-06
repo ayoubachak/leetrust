@@ -76,6 +76,10 @@ impl VM {
                     let value = self.read_constant(constant_idx);
                     self.push(value);
                 },
+                Some(OpCode::Nil) => self.push(0.0),  // Using 0.0 to represent nil
+                Some(OpCode::True) => self.push(1.0), // Using 1.0 to represent true
+                Some(OpCode::False) => self.push(0.0),// Using 0.0 to represent false
+                
                 Some(OpCode::Negate) => {
                     let value = self.pop().unwrap();
                     self.push(-value);
