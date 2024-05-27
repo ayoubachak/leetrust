@@ -30,6 +30,7 @@ pub enum Value {
     Number(f64),
     Bool(bool),
     String(Rc<String>),
+    Identifier(Rc<String>),
     None,
     Error(String),
 }
@@ -45,6 +46,10 @@ impl Value {
 
     pub fn from_string(s: Rc<String>) -> Self {
         Value::String(s)
+    }
+
+    pub fn from_identifier(s: Rc<String>) -> Self {
+        Value::Identifier(s)
     }
 
     pub fn as_number(&self) -> f64 {
@@ -68,6 +73,14 @@ impl Value {
             Rc::clone(s)
         } else {
             panic!("Value is not a string");
+        }
+    }
+
+    pub fn as_identifier(&self) -> Rc<String> {
+        if let Value::Identifier(s) = self {
+            Rc::clone(s)
+        } else {
+            panic!("Value is not an identifier");
         }
     }
 }
@@ -153,6 +166,7 @@ impl PartialEq for Value {
             (Value::Number(a), Value::Number(b)) => a == b,
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::String(a), Value::String(b)) => a == b,
+            (Value::Identifier(a), Value::Identifier(b)) => a == b,
             _ => false,
         }
     }
@@ -164,6 +178,7 @@ impl std::fmt::Debug for Value {
             Value::Number(n) => write!(f, "{}", n),
             Value::Bool(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
+            Value::Identifier(s) => write!(f, "{}", s),
             Value::None => write!(f, "None"),
             Value::Error(e) => write!(f, "Error: {}", e),
         }
@@ -187,6 +202,7 @@ impl std::fmt::Display for Value {
             Value::Number(n) => write!(f, "{}", n),
             Value::Bool(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
+            Value::Identifier(s) => write!(f, "{}", s),
             Value::None => write!(f, "None"),
             Value::Error(e) => write!(f, "Error: {}", e),
         }

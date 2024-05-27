@@ -93,6 +93,34 @@ impl<'a> Compiler<'a> {
         compiler
     }
 
+    fn define_global(&mut self, name: Rc<String>) {
+        let name_constant = self.make_constant(Value::from_string(name.clone()));
+        self.emit_bytes(OpCode::DefineGlobal, OpCode::from_u8(name_constant).unwrap());
+    }
+
+    fn get_global(&mut self, name: Rc<String>) {
+        let name_constant = self.make_constant(Value::from_string(name.clone()));
+        self.emit_bytes(OpCode::GetGlobal, OpCode::from_u8(name_constant).unwrap());
+    }
+
+    fn set_global(&mut self, name: Rc<String>) {
+        let name_constant = self.make_constant(Value::from_string(name.clone()));
+        self.emit_bytes(OpCode::SetGlobal, OpCode::from_u8(name_constant).unwrap());
+    }
+
+    // Placeholder for parsing variable usage
+    fn variable(&mut self, can_assign: bool) {
+        let name = Rc::new(self.previous_token.start.to_string());
+
+        if can_assign && self.current_token.type_ == TokenType::Equal {
+            self.advance(); // Consume the '='
+            self.expression(); // Compile the right-hand side.
+            self.set_global(name); // Emit code to set the variable.
+        } else {
+            self.get_global(name); // Emit code to get the variable.
+        }
+    }
+
     fn advance(&mut self) {
         std::mem::swap(&mut self.previous_token, &mut self.current_token);
         loop {
@@ -234,15 +262,65 @@ impl<'a> Compiler<'a> {
         let constant_index = self.make_constant(Value::from_string(Rc::new(value.to_owned())));
         self.emit_bytes(OpCode::Constant, OpCode::from_u8(constant_index).unwrap());
     }
-    
-    pub fn compile(mut self) -> Result<&'a mut Chunk, InterpretResult> {
+
+    // Add the print statement handling method
+    fn print_statement(&mut self) {
+        self.advance();  // Move past the 'print' token
         self.expression();
-        self.consume(TokenType::Eof, "Expect end of expression.");
+        self.consume(TokenType::Semicolon, "Expect ';' after value.");
+        self.emit_byte(OpCode::Print);
+    }
+
+    // Add the expression statement handling method
+    fn expression_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after expression.");
+        self.emit_byte(OpCode::Pop);  // Discard the result of the expression
+    }
+
+    // Implement the statement method to handle different kinds of statements
+    fn statement(&mut self) {
+        match self.current_token.type_ {
+            TokenType::Print => self.print_statement(),
+            _ => self.expression_statement(),
+        }
+    }
+
+    // Add the var declaration handling method
+    fn var_declaration(&mut self) {
+        let global_name = Rc::new(self.previous_token.start.to_string());
+        self.consume(TokenType::Equal, "Expect '=' after variable name.");
+        self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
+        self.define_global(global_name);
+    }
+
+    // Implement the declaration method to handle different kinds of declarations
+    fn declaration(&mut self) {
+        println!("Declaration type: {:?}", self.current_token.type_);
+        match self.current_token.type_ {
+            TokenType::Var => {
+                self.advance();  // Move past the 'var' token
+                self.var_declaration();
+            },
+            _ => self.statement(),
+        }
+    }
+    
+    // Update the compile method to handle variable declarations
+    pub fn compile(mut self) -> Result<&'a mut Chunk, InterpretResult> {
+        self.advance();  // Move past the initial token
+
+        while self.current_token.type_ != TokenType::Eof {
+            self.declaration();
+            self.advance();
+        }
+
         self.end_compiler();
         if self.had_error {
-            Err(InterpretResult::CompileError) // we return the type of the compile error here (there might be many later)
+            Err(InterpretResult::CompileError)
         } else {
-            Ok(self.chunk) // if no error was found we return the compiled chunk
+            Ok(self.chunk)
         }
     }
 }
@@ -289,6 +367,11 @@ impl Compiler<'_> {
             infix: None,
             precedence: Precedence::Primary,
         });
+        self.rules.insert(TokenType::Identifier, ParseRule {
+            prefix: Some(Rc::new(|comp: &mut Compiler| comp.variable(true))),
+            infix: None,
+            precedence: Precedence::Primary,
+        });
         self.rules.insert(TokenType::False, ParseRule {
             prefix: Some(Rc::new(|comp: &mut Compiler| comp.literal())),
             infix: None,
@@ -307,7 +390,7 @@ impl Compiler<'_> {
         self.rules.insert(TokenType::Bang, ParseRule {
             prefix: Some(Rc::new(|comp: &mut Compiler| comp.unary())),
             infix: None,
-            precedence: Precedence::Unary,  // Make sure the precedence is set appropriately
+            precedence: Precedence::Unary,
         });
         self.rules.insert(TokenType::EqualEqual, ParseRule {
             prefix: None,
@@ -344,18 +427,12 @@ impl Compiler<'_> {
             infix: None,
             precedence: Precedence::Primary,
         });
-        
         self.rules.insert(TokenType::Eof, ParseRule {
             prefix: None,
             infix: None,
-            precedence: Precedence::None, // EOF typically doesn't participate in expressions
+            precedence: Precedence::None,
         });
-
-        
     }
-
- 
-
 
     fn get_rule(&self, type_: TokenType) -> Option<ParseRule> {
         self.rules.get(&type_).cloned()  // Clone the ParseRule here
@@ -365,7 +442,7 @@ impl Compiler<'_> {
         self.advance();
         let current_type = self.previous_token.type_;
         let rule = self.get_rule(current_type);  // Clone the rule to separate its lifecycle from `self`
-    
+        
         if let Some(rule) = rule {
             if let Some(prefix) = &rule.prefix {
                 prefix(self);
@@ -377,7 +454,7 @@ impl Compiler<'_> {
             self.error("Error: Expect expression.");
             return;
         }
-    
+        
         while let Some(next_rule) = self.get_rule(self.current_token.type_) {  // Clone each time to avoid borrowing issues
             if precedence <= next_rule.precedence {
                 self.advance();
@@ -392,6 +469,7 @@ impl Compiler<'_> {
             }
         }
     }
+    
     
 }
 

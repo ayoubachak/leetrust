@@ -1,5 +1,5 @@
 // vm.rs
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 use leetrust::{chunk::Chunk, value::Value, OpCode};
 use crate::compiler::Compiler;
@@ -8,6 +8,7 @@ pub struct VM {
     chunk: Option<Chunk>,
     ip: usize,  // Instruction pointer
     stack: Vec<Value>,  // Stack to hold values
+    globals: HashMap<Rc<String>, Value>, 
 }
 
 impl VM {
@@ -16,6 +17,24 @@ impl VM {
             chunk: None,
             ip: 0,
             stack: Vec::new(),
+            globals: HashMap::new(),
+        }
+    }
+
+    fn define_global(&mut self, name: Rc<String>, value: Value) {
+        self.globals.insert(name, value);
+    }
+
+    fn get_global(&self, name: &Rc<String>) -> Option<Value> {
+        self.globals.get(name).cloned()
+    }
+
+    fn set_global(&mut self, name: Rc<String>, value: Value) -> bool {
+        if self.globals.contains_key(&name) {
+            self.globals.insert(name, value);
+            true
+        } else {
+            false
         }
     }
 
@@ -77,6 +96,37 @@ impl VM {
                     let value = self.read_constant(constant_idx);
                     self.push(value);
                 },
+                // Globals 
+                Some(OpCode::DefineGlobal) => {
+                    let name_idx = self.read_byte() as usize;
+                    let name = self.read_constant(name_idx).as_string();
+                    let value = self.pop().unwrap();
+                    self.define_global(name, value);
+                }
+                Some(OpCode::GetGlobal) => {
+                    let name_idx = self.read_byte() as usize;
+                    let name = self.read_constant(name_idx).as_string();
+                    match self.get_global(&name) {
+                        Some(value) => self.push(value),
+                        None => return InterpretResult::RuntimeError,
+                    }
+                }
+                Some(OpCode::SetGlobal) => {
+                    let name_idx = self.read_byte() as usize;
+                    let name = self.read_constant(name_idx).as_string();
+                    let value = self.pop().unwrap();
+                    if !self.set_global(name.clone(), value.clone()) {
+                        self.define_global(name, value);
+                    }
+                }
+                Some(OpCode::Print) => {
+                    let value = self.pop().unwrap();
+                    println!("{}", value);
+                },
+                // End Globals
+                Some(OpCode::Pop) => {
+                    self.pop();
+                }
                 Some(OpCode::Nil) => self.push(Value::None),  // Using 0.0 to represent nil
                 Some(OpCode::True) => self.push(Value::Bool(true)), // Using 1.0 to represent true
                 Some(OpCode::False) => self.push(Value::Bool(false)),// Using 0.0 to represent false
@@ -160,6 +210,7 @@ impl VM {
                         None => return InterpretResult::RuntimeError,
                     };
                 },
+
                 _ => return InterpretResult::RuntimeError,
             }
         }
